@@ -1,0 +1,123 @@
+/* Sumber: architecture/06-design/globals.css — gaya "Lab Futuristik" (ADR-011, menggantikan Punk Skate Lab).
+   Perbedaan dengan sumber: @import Google Fonts diganti next/font (font di-host lokal agar PWA tetap
+   tampil benar saat offline — DEC-020). Komponen tambahan di bawah hanya memakai token. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { color-scheme: light; }
+  body { @apply bg-paper text-ink font-sans antialiased; background-image: radial-gradient(1200px 600px at 85% -10%, rgba(99, 230, 207, 0.14), transparent 60%), linear-gradient(#E2E8EA 1px, transparent 1px), linear-gradient(90deg, #E2E8EA 1px, transparent 1px); background-size: auto, 32px 32px, 32px 32px; background-attachment: fixed; }
+  h1, h2, h3 { @apply font-display font-semibold leading-[1.05] tracking-[-0.02em]; }
+  :focus-visible { outline: 2px solid #63E6CF; outline-offset: 2px; }
+}
+
+@layer components {
+  .card        { @apply rounded-2xl bg-surface/90 border-3 border-ink shadow-hard p-[22px] backdrop-blur-sm; }
+  .card-ink    { @apply rounded-2xl bg-ink text-paper border-3 border-ink shadow-hard-safety p-[22px]; }
+  .btn         { @apply inline-flex items-center justify-center gap-2 min-h-touch rounded-xl px-5 border-3 border-ink text-sm font-bold tracking-wide transition; }
+  .btn-primary { @apply btn bg-safety text-ink shadow-hard-sm hover:brightness-105 active:translate-y-px; }
+  .btn-acid    { @apply btn bg-acid text-ink shadow-hard-sm; }
+  .tag-mono    { @apply rounded-full font-mono text-[11px] font-semibold tracking-[0.14em] bg-ink text-acid px-3 py-1; }
+  .badge-conf  { @apply inline-flex items-center justify-center w-7 h-7 rounded-lg border-2 border-ink font-mono font-bold text-ink; }
+  .bar         { @apply h-3 rounded-full overflow-hidden border-2 border-ink bg-surface; }
+  .num         { @apply font-mono tabular-nums; }
+
+  /* --- tambahan aplikasi (token saja) --- */
+  .btn-ghost   { @apply btn bg-surface text-ink hover:bg-paper; }
+  .btn:disabled { @apply opacity-50 cursor-not-allowed shadow-none; }
+  .label-mono  { @apply font-mono text-[11px] font-semibold tracking-[0.12em] uppercase text-muted; }
+  .field       { @apply min-h-[48px] w-full rounded-xl border-3 border-ink bg-surface px-3 font-mono text-base font-semibold transition focus:border-acid; }
+  .field[aria-invalid='true'] { @apply border-safety; }
+  .chip        { @apply flex min-h-[48px] items-center justify-between gap-2 rounded-xl border-3 border-ink bg-surface px-3.5 text-left text-sm font-semibold transition; }
+  .chip[aria-pressed='true'], .chip[aria-checked='true'] { @apply bg-acid shadow-hard-sm; }
+  .chip-ink[aria-pressed='true'], .chip-ink[aria-checked='true'] { @apply bg-ink text-acid shadow-hard-safety; }
+  .lab-paper   { @apply bg-paper bg-lab-grid bg-[length:32px_32px]; }
+}
+
+/* Gaya garis rambut: garis "ink" tampil lembut; kotak bergaris ikut membulat; tanpa kemiringan stiker. */
+.border-ink { border-color: rgb(14 26 31 / 0.16); }
+.bg-ink.border-ink, .bg-ink .border-ink { border-color: rgb(99 230 207 / 0.18); }
+.border-3:not(td):not(th):not(tr):not(table) { border-radius: 0.875rem; }
+[class*='rotate-']:not(svg):not(svg *) { --tw-rotate: 0deg !important; }
+.label-mono.text-acid, .bg-ink .label-mono, .card-ink .label-mono { color: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* Animasi loading "file terbang" (DEC-075/079: siklus 4 detik, permintaan owner — dipakai di alert penyimpanan Pencatatan Data). */
+.loader-con {
+  position: relative;
+  width: 50%;
+  height: 100px;
+  overflow: hidden;
+}
+.pfile {
+  position: absolute;
+  bottom: 25px;
+  width: 40px;
+  height: 50px;
+  background: linear-gradient(90deg, #b324db, #ac8dcb);
+  border-radius: 4px;
+  transform-origin: center;
+  animation: flyRight 4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.667s);
+  opacity: 0;
+}
+.pfile::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 28px;
+  height: 4px;
+  background-color: #ffffff;
+  border-radius: 2px;
+}
+.pfile::after {
+  content: "";
+  position: absolute;
+  top: 13px;
+  left: 6px;
+  width: 18px;
+  height: 4px;
+  background-color: #ffffff;
+  border-radius: 2px;
+}
+@keyframes flyRight {
+  0% { left: -10%; transform: scale(0); opacity: 0; }
+  50% { left: 45%; transform: scale(1.2); opacity: 1; }
+  100% { left: 100%; transform: scale(0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pfile { animation-duration: 6s; }
+}
+
+/* Alert sukses muncul dari sisi kanan (DEC-079). */
+@keyframes slideInRight {
+  from { transform: translateX(calc(100% + 2rem)); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.alert-slide-in { animation: slideInRight 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* StrokeText (GSAP, komponen owner — DEC-079). */
+/* LightTunnel (DEC-082) */
+.light-tunnel-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.light-tunnel-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.stroke-text { display: block; width: 100%; line-height: 0; }
+.stroke-text--hover { cursor: pointer; }
+.stroke-text__svg { display: block; width: 100%; height: var(--stroke-text-height, 160px); }
+.stroke-text__stroke, .stroke-text__fill { user-select: none; }

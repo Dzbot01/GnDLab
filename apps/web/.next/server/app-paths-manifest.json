@@ -1,0 +1,11 @@
+{
+  "/icon.svg/route": "app/icon.svg/route.js",
+  "/api/v1/datasets/active/route": "app/api/v1/datasets/active/route.js",
+  "/api/v1/scenarios/route": "app/api/v1/scenarios/route.js",
+  "/page": "app/page.js",
+  "/gudang/page": "app/gudang/page.js",
+  "/lab/page": "app/lab/page.js",
+  "/lab/hasil/page": "app/lab/hasil/page.js",
+  "/muat/page": "app/muat/page.js",
+  "/skenario/page": "app/skenario/page.js"
+}

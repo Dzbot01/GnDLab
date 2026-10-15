@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import { allocationTotal, blankItem, daysInclusive, itemTotal, newLpj, nextLpjId, parseRp, realizationTotal, subtotals, tanggalPanjang, terbilang, usedPrice } from '@/lib/belanja';
+import { buildLpjDocx } from '@/lib/belanjaDocx';
+
+describe('laporan belanja / LPJ (DEC-059)', () => {
+  it('terbilang rupiah', () => {
+    expect(terbilang(5876200)).toBe('Lima Juta Delapan Ratus Tujuh Puluh Enam Ribu Dua Ratus Rupiah');
+    expect(terbilang(0)).toBe('Nol Rupiah');
+    expect(terbilang(11)).toBe('Sebelas Rupiah');
+    expect(terbilang(1100)).toBe('Seribu Seratus Rupiah');
+    expect(terbilang(115000)).toBe('Seratus Lima Belas Ribu Rupiah');
+    expect(terbilang(2000000000)).toBe('Dua Miliar Rupiah');
+  });
+
+  it('angka isian rupiah & tanggal', () => {
+    expect(parseRp('Rp 1.250.000')).toBe(1250000);
+    expect(parseRp('18000')).toBe(18000);
+    expect(parseRp('10.000,00')).toBe(10000);
+    expect(parseRp('')).toBe(0);
+    expect(daysInclusive('2026-10-12', '2026-10-18')).toBe(7);
+    expect(daysInclusive('2026-10-26', '2026-10-26')).toBe(1);
+    expect(daysInclusive('2026-10-26', '')).toBeUndefined();
+    expect(tanggalPanjang('2026-10-08')).toBe('8 Oktober 2026');
+  });
+
+  it('faktor 1 = harga dasar + batas atas %; jumlah = jumlah beli × harga dipakai (contoh owner)', () => {
+    const gula = { ...blankItem('Umum'), name: 'Gula pasir', qty: '1', unit: 'kg', basePrice: '18.000', factor: 1 as const };
+    const kelapa = { ...blankItem('Umum'), name: 'Kelapa', qty: '40', unit: 'kg', basePrice: '10.000', factor: 0 as const };
+    const baki = { ...blankItem('Kopra'), name: 'Natrium bisulfit', qty: '1', unit: 'pak', basePrice: '50.000', factor: 1 as const };
+    expect(usedPrice(gula, '50')).toBe(27000);
+    expect(itemTotal(kelapa, '50')).toBe(400000);
+    const sec = { title: 'Bahan', intro: '', note: '', items: [kelapa, gula, baki] };
+    expect(subtotals(sec, '50')).toEqual([['Umum', 427000], ['Kopra', 75000]]);
+    const r = { ...newLpj('LPJ-202610-01'), sections: [sec], proofs: [{ title: 'a', total: '100.000', description: '', receipts: [], goods: [] }, { title: 'b', total: 'Rp 27.000', description: '', receipts: [], goods: [] }] };
+    expect(allocationTotal(r)).toBe(502000);
+    expect(realizationTotal(r)).toBe(127000);
+  });
+
+  it('ID berurutan per bulan', () => {
+    const d = new Date(2026, 9, 11);
+    expect(nextLpjId([], d)).toBe('LPJ-202610-01');
+    expect(nextLpjId(['LPJ-202610-01', 'LPJ-202610-07', 'LPJ-202609-09'], d)).toBe('LPJ-202610-08');
+  });
+
+  it('Word: hanya bukti alokasi — judul ALOKASI, tabel nota | barang, total + terbilang, keterangan', () => {
+    const r = { ...newLpj('LPJ-202610-01'), proofs: [{ title: 'Bahan <umum>', total: '427.000', description: 'Kelapa & gula', receipts: [], goods: [] }] };
+    const doc = new TextDecoder().decode(buildLpjDocx(r));
+    for (const t of ['BUKTI ALOKASI', 'ALOKASI — Bahan &lt;umum&gt;', 'Foto Bukti Bayar / Nota', 'Foto Barang yang Dibeli', 'Rp427.000', 'Empat Ratus Dua Puluh Tujuh Ribu Rupiah', 'Keterangan: Kelapa &amp; gula']) expect(doc).toContain(t);
+    expect(doc).not.toContain('Lampiran 1');
+  });
+});
+
+describe('laporan belanja ikut cadangan lab (DEC-061)', () => {
+  it('cadangan memuat belanja; pulihkan hanya menambah yang belum ada', async () => {
+    const { labBackupJson, parseBackup, planRestore } = await import('@/lib/labBackup');
+    const a = newLpj('LPJ-202610-01');
+    const b = { ...newLpj('LPJ-202610-02'), proofs: [{ title: 'x', total: '1.000', description: '', receipts: [{ id: 'p', name: 'nota.jpg', dataUrl: 'data:image/jpeg;base64,AA==' }], goods: [] }] };
+    const parsed = parseBackup(labBackupJson([], 'x', { belanja: [a, b] }));
+    expect(parsed.belanja!.map((r) => r.id)).toEqual(['LPJ-202610-01', 'LPJ-202610-02']);
+    const plan = planRestore(parsed, { experiments: new Set(), entries: new Set(), protocols: new Set(), media: new Set(), belanja: new Set(['LPJ-202610-01']) });
+    expect(plan.add.belanja.map((r) => r.id)).toEqual(['LPJ-202610-02']);
+    expect(plan.add.belanja[0]!.proofs[0]!.receipts[0]!.name).toBe('nota.jpg');
+    expect(plan.skipped).toEqual([{ kind: 'laporan belanja', id: 'LPJ-202610-01' }]);
+    expect(planRestore(parseBackup(labBackupJson([], 'x')), { experiments: new Set(), entries: new Set(), protocols: new Set(), media: new Set() }).add.belanja).toEqual([]);
+  });
+});
+
+describe('laporan belanja: nama barang, PPTX diagram cabang, PDF (DEC-078)', () => {
+  const jpg = 'data:image/jpeg;base64,/9j/AA';
+  const ph = (id: string, label?: string) => ({ id, name: `${id}.jpg`, dataUrl: jpg, ...(label && { label }) });
+  const r = () => ({ ...newLpj('LPJ-202610-03'), purpose: 'Belanja R&D', proofs: [
+    { title: 'Toko Kimia Jaya', total: '427.000', description: 'bahan', receipts: [ph('n1')], goods: [ph('b1', 'Natrium bisulfit'), ph('b2', 'Kertas pH'), ph('b3')] },
+    { title: '', total: '', description: '', receipts: [], goods: [] },
+  ] });
+
+  it('slide per toko: judul Laporan belanja, akar = nota, cabang = barang + nama', async () => {
+    const { lpjTreeSlides } = await import('@/lib/belanjaExport');
+    const t = lpjTreeSlides(r(), 'x');
+    expect(t).toHaveLength(2);
+    expect(t[0]!.title).toBe('Laporan belanja');
+    expect(t[0]!.subtitle).toBe('Toko Kimia Jaya · total Rp427.000 · Belanja R&D');
+    expect(t[0]!.roots).toHaveLength(1);
+    expect(t[0]!.leaves.map((l) => l.label)).toEqual(['Natrium bisulfit', 'Kertas pH', '']);
+    expect(t[1]!.subtitle).toBe('Toko 2 · Belanja R&D');
+  });
+
+  it('PPTX pohon: garis konektor, nama barang di tengah, tanpa foto nota → kotak', async () => {
+    const { lpjTreeSlides } = await import('@/lib/belanjaExport');
+    const { buildTreePptx } = await import('@/lib/officeExport');
+    const x = new TextDecoder().decode(buildTreePptx(lpjTreeSlides(r(), 'x')));
+    expect((x.match(/<p:cxnSp>/g) ?? []).length).toBe(5); // batang + datar + 3 turun
+    expect(x).toContain('Natrium bisulfit');
+    expect(x).toContain('(tanpa nama)');
+    expect(x).toContain('tanpa foto nota');
+    expect(x).toContain('algn="ctr"');
+  });
+
+  it('PDF model & Word: nama barang ikut', async () => {
+    const { lpjReport } = await import('@/lib/belanjaExport');
+    const rep = lpjReport(r(), 'x');
+    expect(rep.blocks[0]!.heading).toBe('Toko Kimia Jaya');
+    expect(rep.blocks[0]!.lines).toContain('Barang: Natrium bisulfit, Kertas pH');
+    expect(rep.blocks[0]!.images.map((i) => i.caption)).toEqual(['Nota · Toko Kimia Jaya', 'Natrium bisulfit', 'Kertas pH', '(tanpa nama barang)']);
+    expect(new TextDecoder().decode(buildLpjDocx(r()))).toContain('Barang: Natrium bisulfit, Kertas pH');
+  });
+});
